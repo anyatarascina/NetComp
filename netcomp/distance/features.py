@@ -11,6 +11,7 @@ from scipy import stats
 
 from netcomp.linalg import _eps
 
+
 def get_features(A):
     """Feature grabber for NetSimile algorithm. Features used are
 
@@ -39,42 +40,46 @@ def get_features(A):
 
     """
     try:
-        G = nx.from_scipy_sparse_matrix(A)
+        G = nx.from_scipy_sparse_array(A)
     except AttributeError:
-        G = nx.from_numpy_matrix(A)
+        G = nx.from_numpy_array(A)
     n = len(G)
+
     # degrees, array so we can slice nice
-    d_vec = np.array(list(G.degree().values()))
+    d_vec = np.array(list(dict(G.degree()).values()))
+
     # list of clustering coefficient
     clust_vec = np.array(list(nx.clustering(G).values()))
-    neighbors = [G.neighbors(i) for i in range(n)]
+    neighbors = [list(G.neighbors(i)) for i in range(n)]
+
     # average degree of neighbors (0 if node is isolated)
-    neighbor_deg = [d_vec[neighbors[i]].sum()/d_vec[i]
-                    if d_vec[i]>_eps else 0 for i in range(n)]
+    neighbor_deg = [d_vec[neighbors[i]].sum() / d_vec[i] if d_vec[i] > _eps else 0 for i in range(n)]
+
     # avg. clustering coefficient of neighbors (0 if node is isolated)
-    neighbor_clust = [clust_vec[neighbors[i]].sum()/d_vec[i] 
-                    if d_vec[i]>_eps else 0 for i in range(n)]
-    egonets = [nx.ego_graph(G,i) for i in range(n)]
+    neighbor_clust = [clust_vec[neighbors[i]].sum() / d_vec[i] if d_vec[i] > _eps else 0 for i in range(n)]
+    egonets = [nx.ego_graph(G, i) for i in range(n)]
+
     # number of edges in egonet
     ego_size = [G.number_of_edges() for G in egonets]
+
     # number of neighbors of egonet
-    ego_neighbors = [len(set.union(*[set(neighbors[j])
-                                     for j in egonets[i].nodes()]) -
-                         set(egonets[i].nodes()))
-                     for i in range(n)]
+    ego_neighbors = [
+        len(set.union(*[set(neighbors[j]) for j in egonets[i].nodes()]) - set(egonets[i].nodes())) for i in range(n)
+    ]
+
     # number of edges outgoing from egonet
-    outgoing_edges = [len([edge for edge in G.edges(egonets[i].nodes()) 
-                           if edge[1] not in egonets[i].nodes()]) 
-                      for i in range(n)]
+    outgoing_edges = [
+        len([edge for edge in G.edges(egonets[i].nodes()) if edge[1] not in egonets[i].nodes()]) for i in range(n)
+    ]
+
     # use mat.T so that each node is a row (standard format)
-    feature_mat = np.array([d_vec,clust_vec,neighbor_deg,neighbor_clust,
-                            ego_size,ego_neighbors,outgoing_edges]).T 
+    feature_mat = np.array([
+        d_vec, clust_vec, neighbor_deg, neighbor_clust, ego_size, ego_neighbors, outgoing_edges
+    ]).T
     return feature_mat
 
 
-
-
-def aggregate_features(feature_mat,row_var=False,as_matrix=False):
+def aggregate_features(feature_mat, row_var=False, as_matrix=False):
     """Returns column-wise descriptive statistics of a feature matrix.
 
     Parameters
@@ -102,12 +107,11 @@ def aggregate_features(feature_mat,row_var=False,as_matrix=False):
     References
     ----------
     """
-    axis = int(row_var) # 0 if column-oriented, 1 if not
-    description = np.array([feature_mat.mean(axis=axis),
-                            np.median(feature_mat,axis=axis),
-                            np.std(feature_mat,axis=axis),
-                            stats.skew(feature_mat,axis=axis),
-                            stats.kurtosis(feature_mat,axis=axis)])
+    axis = int(row_var)  # 0 if column-oriented, 1 if not
+    description = np.array([
+        feature_mat.mean(axis=axis), np.median(feature_mat, axis=axis), np.std(feature_mat, axis=axis),
+        stats.skew(feature_mat, axis=axis), stats.kurtosis(feature_mat, axis=axis)
+    ])
     if not as_matrix:
         description = description.flatten()
     return description
